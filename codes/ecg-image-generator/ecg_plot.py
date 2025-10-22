@@ -510,6 +510,55 @@ def ecg_plot(
     plt.clf()
     plt.cla()
 
+    plt.savefig(os.path.join(output_dir, tail + '.png'), dpi=resolution)
+    plt.close(fig)
+    plt.clf()
+    plt.cla()
+
+    # ---- Save lead mask as .npy ----
+    if bbox:
+        import numpy as np
+        mask_h, mask_w = json_dict['height'], json_dict['width']
+        mask = np.zeros((int(mask_h), int(mask_w)), dtype=np.uint8)
+
+        for lead_idx, lead in enumerate(leads_ds, start=1):
+            if "plotted_pixels" in lead:
+                for (y, x) in lead["plotted_pixels"]:
+                    xi = int(round(x))
+                    yi = int(round(y))
+                    if 0 <= yi < mask_h and 0 <= xi < mask_w:
+                        mask[yi, xi] = lead_idx  # unique ID per lead
+
+        np.save(os.path.join(output_dir, tail + '_mask.npy'), mask)
+
+    # ---- Save bounding boxes to YOLO .txt file ----
+    if store_text_bbox or bbox:
+        txt_path = os.path.join(output_dir, tail + '.txt')
+        with open(txt_path, 'w') as f:
+            img_w = json_dict['width']
+            img_h = json_dict['height']
+            for lead in leads_ds:
+                # write lead bounding box
+                if "lead_bounding_box" in lead:
+                    box = lead["lead_bounding_box"]
+                    x1, y1 = box[0][1], box[0][0]
+                    x2, y2 = box[2][1], box[2][0]
+                    cx = ((x1 + x2) / 2.0) / img_w
+                    cy = ((y1 + y2) / 2.0) / img_h
+                    w = (x2 - x1) / img_w
+                    h = (y2 - y1) / img_h
+                    f.write(f"lead {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n")
+                # write text bounding box if available
+                if "text_bounding_box" in lead:
+                    box = lead["text_bounding_box"]
+                    x1, y1 = box[0][1], box[0][0]
+                    x2, y2 = box[2][1], box[2][0]
+                    cx = ((x1 + x2) / 2.0) / img_w
+                    cy = ((y1 + y2) / 2.0) / img_h
+                    w = (x2 - x1) / img_w
+                    h = (y2 - y1) / img_h
+                    f.write(f"text {cx:.6f} {cy:.6f} {w:.6f} {h:.6f}\n")
+
     if pad_inches!=0:
         
         ecg_image = Image.open(os.path.join(output_dir,tail +'.png'))
